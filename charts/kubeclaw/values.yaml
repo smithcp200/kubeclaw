@@ -527,13 +527,17 @@ egressFilter:
     pullPolicy: IfNotPresent
   # Number of Blocky replicas. 1 is sufficient for a single Gateway.
   replicas: 1
+  # Blocky is the gateway's DNS resolver (resolv.conf points here). A tight CPU
+  # limit throttles DNS under contention, intermittently stalling name lookups
+  # (e.g. the gateway's litellm.*.svc.cluster.local calls) past probe timeouts.
+  # Allow it to burst so resolution stays responsive.
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 100m
+      memory: 96Mi
     limits:
-      cpu: 200m
-      memory: 128Mi
+      cpu: "1"
+      memory: 256Mi
   # Security context for the Blocky container.
   # The spx01/blocky image runs as uid 100 (non-root). The binary is only
   # executable by that user, so runAsUser must match.

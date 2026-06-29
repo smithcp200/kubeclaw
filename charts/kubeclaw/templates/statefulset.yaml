@@ -264,15 +264,19 @@ spec:
             timeoutSeconds: 3
 
           # Liveness probe: restart if the gateway becomes unresponsive.
+          # `node dist/index.js health` spawns a Node process and makes
+          # name-based control-plane checks; under cluster DNS/CPU contention it
+          # can take well over 10s. Generous timeout + failureThreshold avoid
+          # killing a healthy-but-busy gateway (don't restart for ~6 min).
           livenessProbe:
             exec:
               command:
                 - node
                 - dist/index.js
                 - health
-            failureThreshold: 3
-            periodSeconds: 30
-            timeoutSeconds: 10
+            failureThreshold: 6
+            periodSeconds: 60
+            timeoutSeconds: 30
 
           # Readiness probe: remove from Service endpoints when not ready.
           readinessProbe:
@@ -282,8 +286,8 @@ spec:
                 - dist/index.js
                 - health
             failureThreshold: 3
-            periodSeconds: 10
-            timeoutSeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 30
 
         # -------------------------------------------------------------------------
         # Tailscale sidecar (optional)

@@ -52,6 +52,17 @@ secret:
     # OPENAI_API_KEY: ""
 
 # ------------------------------------------------------------------------------
+# SELinux
+# Fixed MCS level applied to every pod that mounts the state PVC (gateway +
+# qmd/backup/diagnostics jobs). On enforcing-SELinux nodes (Bottlerocket /
+# EKS Auto Mode) each pod otherwise gets random MCS categories and the kubelet
+# relabels the shared ReadWriteOnce volume to whichever mounted last, denying
+# the others (EACCES despite correct ownership). Set "" to disable on platforms
+# without enforcing SELinux (e.g. Docker Desktop).
+# ------------------------------------------------------------------------------
+seLinuxLevel: "s0:c0,c1"
+
+# ------------------------------------------------------------------------------
 # Persistent Storage
 # The Gateway stores all state under /home/node/.openclaw.
 # Default: single PVC. Optional: split state vs workspace PVCs.

@@ -37,6 +37,7 @@ spec:
             runAsUser: 1000
             runAsGroup: 1000
             fsGroup: 1000
+            {{- include "kubeclaw.seLinuxOptions" . | nindent 12 }}
           initContainers:
             # Fix PVC directory permissions (same pattern as diagnostics CronJob).
             - name: fix-permissions

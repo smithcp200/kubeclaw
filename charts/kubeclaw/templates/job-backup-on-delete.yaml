@@ -32,6 +32,7 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+        {{- include "kubeclaw.seLinuxOptions" . | nindent 8 }}
       initContainers:
         - name: fix-permissions
           image: {{ include "kubeclaw.image" . }}

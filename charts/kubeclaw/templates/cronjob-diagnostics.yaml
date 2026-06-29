@@ -35,6 +35,7 @@ spec:
             runAsUser: 1000
             runAsGroup: 1000
             fsGroup: 1000
+            {{- include "kubeclaw.seLinuxOptions" . | nindent 12 }}
           initContainers:
             # Fix PVC directory permissions. Many volume drivers mount with
             # root ownership, and the Gateway binary attempts chmod 700 on

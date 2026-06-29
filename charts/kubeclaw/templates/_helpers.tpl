@@ -328,3 +328,17 @@ Name of the Gateway API Gateway resource.
 {{- define "kubeclaw.gatewayAPIName" -}}
 {{- printf "%s-gateway-api" (include "kubeclaw.fullname" .) }}
 {{- end }}
+
+{{/*
+Fixed SELinux MCS level for every pod that mounts the state PVC. Without a fixed
+level the kubelet assigns each pod random MCS categories and relabels the shared
+ReadWriteOnce volume to whichever mounted last, locking the others out on
+enforcing-SELinux nodes (Bottlerocket / EKS Auto Mode) — surfaces as EACCES
+despite correct ownership. Empty .Values.seLinuxLevel disables (e.g. Docker Desktop).
+*/}}
+{{- define "kubeclaw.seLinuxOptions" -}}
+{{- if .Values.seLinuxLevel }}
+seLinuxOptions:
+  level: {{ .Values.seLinuxLevel | quote }}
+{{- end }}
+{{- end -}}

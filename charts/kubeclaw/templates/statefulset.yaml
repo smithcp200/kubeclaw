@@ -52,6 +52,7 @@ spec:
         runAsGroup: 1000
         runAsNonRoot: true
         fsGroup: 1000
+        {{- include "kubeclaw.seLinuxOptions" . | nindent 8 }}
         seccompProfile:
           type: RuntimeDefault
       {{- with .Values.pod.runtimeClassName }}
@@ -84,9 +85,9 @@ spec:
             - /bin/sh
             - -c
             - |
-              mkdir -p /data/credentials /data/agents/main/sessions /data/agents/main/agent || true
+              mkdir -p /data/credentials /data/agents/main/sessions /data/agents/main/agent /data/workspace/employees /data/devices || true
               chown -R 1000:1000 /data || true
-              chmod 700 /data /data/credentials /data/agents /data/agents/main /data/agents/main/sessions /data/agents/main/agent || true
+              chmod 700 /data /data/credentials /data/agents /data/agents/main /data/agents/main/sessions /data/agents/main/agent /data/workspace /data/workspace/employees /data/devices || true
           volumeMounts:
             - name: {{ include "kubeclaw.statePvcName" . }}
               mountPath: /data

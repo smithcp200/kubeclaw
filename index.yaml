@@ -7,8 +7,8 @@ entries:
         fingerprint: <GPG_FINGERPRINT>
         url: https://kubeclaw.dev/gpg.asc
     apiVersion: v2
-    appVersion: 2026.4.2
-    created: "2026-04-05T05:07:38.507267207Z"
+    appVersion: 2026.4.2-cc.0
+    created: "2026-06-29T02:33:39.16051759Z"
     dependencies:
     - alias: litellm
       condition: litellm.enabled
@@ -28,7 +28,7 @@ entries:
     description: 'KubeClaw is production-grade OpenClaw on Kubernetes. It is designed
       for operators who want a secure, observable, and reliable deployment path without
       giving up flexibility. '
-    digest: 0407b2218bff4ca3203654be68cbb83744335fb6d2df179ab0196a3e5b9338e4
+    digest: 375b0e514f408f0b730b672676b7527705084e672cae4ec486e626935a18e4ca
     home: https://github.com/iMerica/kubeclaw
     keywords:
     - kubeclaw
@@ -45,6 +45,6 @@ entries:
     - https://github.com/iMerica/kubeclaw
     type: application
     urls:
-    - https://iMerica.github.io/kubeclaw/kubeclaw-2026.4.2.tgz
-    version: 2026.4.2
-generated: "2026-04-05T05:07:38.48218487Z"
+    - https://smithcp200.github.io/kubeclaw/kubeclaw-2026.4.2-cc.0.tgz
+    version: 2026.4.2-cc.0
+generated: "2026-06-29T02:33:39.133503539Z"

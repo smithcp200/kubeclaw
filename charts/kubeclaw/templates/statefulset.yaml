@@ -263,31 +263,27 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 3
 
-          # Liveness probe: restart if the gateway becomes unresponsive.
-          # `node dist/index.js health` spawns a Node process and makes
-          # name-based control-plane checks; under cluster DNS/CPU contention it
-          # can take well over 10s. Generous timeout + failureThreshold avoid
-          # killing a healthy-but-busy gateway (don't restart for ~6 min).
+          # Liveness/readiness use a lightweight TCP check on the gateway port
+          # (same as the startup probe). The previous `node dist/index.js health`
+          # exec cold-starts a full Node process (loads all plugins) on every
+          # probe, which exceeds even a 30s timeout under CPU/DNS contention —
+          # tripping liveness and crash-looping a gateway that is actually fine.
+          # TCP-readiness is sufficient: the port being open means the gateway
+          # HTTP server is serving (which is what the web WS-proxy connects to).
           livenessProbe:
-            exec:
-              command:
-                - node
-                - dist/index.js
-                - health
+            tcpSocket:
+              port: gateway
             failureThreshold: 6
-            periodSeconds: 60
-            timeoutSeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
 
           # Readiness probe: remove from Service endpoints when not ready.
           readinessProbe:
-            exec:
-              command:
-                - node
-                - dist/index.js
-                - health
+            tcpSocket:
+              port: gateway
             failureThreshold: 3
-            periodSeconds: 30
-            timeoutSeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
 
         # -------------------------------------------------------------------------
         # Tailscale sidecar (optional)

@@ -27,6 +27,13 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "kubeclaw.serviceAccountName" . }}
       restartPolicy: Never
+      # Must run on the node holding the Gateway's ReadWriteOnce state PVC. Safe
+      # for a pre-delete hook: hook-weight -5 runs before the StatefulSet is
+      # torn down, so the Gateway pod is still present to match. If it is
+      # already gone this pod stays Pending and activeDeadlineSeconds above
+      # fails the hook, rather than silently skipping the backup.
+      affinity:
+        {{- include "kubeclaw.gatewayColocation" . | nindent 8 }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

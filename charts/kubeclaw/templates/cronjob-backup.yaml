@@ -16,6 +16,15 @@ spec:
   failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
   jobTemplate:
     spec:
+      {{- with .Values.backup.activeDeadlineSeconds }}
+      # Bounds a run that can never make progress. concurrencyPolicy: Forbid
+      # means a wedged job blocks every later run, so without a deadline one
+      # stuck pod stops the schedule permanently.
+      activeDeadlineSeconds: {{ . }}
+      {{- end }}
+      {{- with .Values.backup.backoffLimit }}
+      backoffLimit: {{ . }}
+      {{- end }}
       template:
         metadata:
           labels:
@@ -28,6 +37,9 @@ spec:
           {{- end }}
           serviceAccountName: {{ include "kubeclaw.serviceAccountName" . }}
           restartPolicy: OnFailure
+          # Must run on the node holding the Gateway's ReadWriteOnce state PVC.
+          affinity:
+            {{- include "kubeclaw.gatewayColocation" . | nindent 12 }}
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000

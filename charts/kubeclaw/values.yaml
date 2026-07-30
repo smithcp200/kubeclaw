@@ -328,6 +328,12 @@ memory:
     concurrencyPolicy: Forbid
     successfulJobsHistoryLimit: 1
     failedJobsHistoryLimit: 1
+    # Fail the job if a run exceeds this. Keep it at or under the schedule
+    # interval: with Forbid an unbounded run blocks every later tick, so the
+    # deadline is what lets the schedule recover without a human. Set to null
+    # to disable (not recommended).
+    activeDeadlineSeconds: 300
+    backoffLimit: 2
     resources:
       requests:
         cpu: 100m
@@ -343,6 +349,11 @@ memory:
     concurrencyPolicy: Forbid
     successfulJobsHistoryLimit: 1
     failedJobsHistoryLimit: 1
+    # Deliberately longer than the 15m schedule: the first run downloads the
+    # ~0.6 GB GGUF model onto the PVC, and killing that mid-download makes every
+    # later run start over. Worst case a wedged run costs two ticks.
+    activeDeadlineSeconds: 1800
+    backoffLimit: 1
     resources:
       requests:
         cpu: 500m
@@ -647,6 +658,9 @@ diagnostics:
   statusAll: false
   # Concurrency policy: Forbid prevents overlapping runs.
   concurrencyPolicy: Forbid
+  # Fail a run that exceeds this, so Forbid cannot block the schedule forever.
+  activeDeadlineSeconds: 600
+  backoffLimit: 1
   # History limits.
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
@@ -678,6 +692,9 @@ backup:
   pathPrefix: ""
   # Concurrency policy: Forbid prevents overlapping runs.
   concurrencyPolicy: Forbid
+  # Fail a run that exceeds this, so Forbid cannot block the schedule forever.
+  activeDeadlineSeconds: 3600
+  backoffLimit: 2
   # History limits.
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1

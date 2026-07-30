@@ -342,3 +342,30 @@ seLinuxOptions:
   level: {{ .Values.seLinuxLevel | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Co-locates a pod with the Gateway pod. Required for every pod that mounts the
+Gateway's ReadWriteOnce state PVC.
+
+An EBS volume attaches to exactly one node, but the bound PV's node affinity
+only constrains the availability zone — not the node. With more than one node
+in the zone the scheduler is free to place these pods away from the Gateway,
+and the attach can then never succeed. Volume attachment does not crash and
+retry, it waits: the pod sits in Init:0/N with zero restarts and (on EKS Auto
+Mode) no FailedAttachVolume event, indefinitely. Combined with
+concurrencyPolicy: Forbid that wedges every later run of the CronJob too, so a
+single mis-scheduled pod silently stops the schedule until a human intervenes.
+
+Pinning to the Gateway pod rather than a fixed node keeps this correct when the
+Gateway is rescheduled (e.g. Spot reclaim). If the Gateway is mid-move the job
+goes Pending instead of wedging, and activeDeadlineSeconds bounds that wait.
+*/}}
+{{- define "kubeclaw.gatewayColocation" -}}
+podAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchLabels:
+          {{- include "kubeclaw.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/component: gateway
+      topologyKey: kubernetes.io/hostname
+{{- end -}}

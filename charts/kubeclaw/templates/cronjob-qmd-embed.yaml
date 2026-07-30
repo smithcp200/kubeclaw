@@ -20,6 +20,16 @@ spec:
   failedJobsHistoryLimit: {{ .Values.memory.embed.failedJobsHistoryLimit }}
   jobTemplate:
     spec:
+      {{- with .Values.memory.embed.activeDeadlineSeconds }}
+      # Bounds a run that can never make progress. concurrencyPolicy: Forbid
+      # means a wedged job blocks every later run, so without a deadline one
+      # stuck pod stops the schedule permanently. Generous here: the first run
+      # downloads the ~0.6 GB GGUF model onto the PVC.
+      activeDeadlineSeconds: {{ . }}
+      {{- end }}
+      {{- with .Values.memory.embed.backoffLimit }}
+      backoffLimit: {{ . }}
+      {{- end }}
       template:
         metadata:
           labels:
@@ -32,6 +42,9 @@ spec:
           {{- end }}
           serviceAccountName: {{ include "kubeclaw.serviceAccountName" . }}
           restartPolicy: OnFailure
+          # Must run on the node holding the Gateway's ReadWriteOnce state PVC.
+          affinity:
+            {{- include "kubeclaw.gatewayColocation" . | nindent 12 }}
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000

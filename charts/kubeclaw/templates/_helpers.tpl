@@ -412,9 +412,19 @@ Usage:
 {{- define "kubeclaw.datadogPodLabels" -}}
 {{- $ctx := .ctx -}}
 tags.datadoghq.com/service: {{ printf "%s-%s" (include "kubeclaw.fullname" $ctx) .component | trunc 63 | trimSuffix "-" }}
-{{- if $ctx.Chart.AppVersion }}
-tags.datadoghq.com/version: {{ $ctx.Chart.AppVersion | replace "+" "_" | quote }}
-{{- end }}
+{{- /*
+    DELIBERATELY NO tags.datadoghq.com/version.
+
+    Datadog already derives `version` from the container image tag, and it is
+    correct today: gateway spans carry version 2026.6.10 from image tag
+    2026.6.10-cc.slack1. Chart.AppVersion is NOT maintained against the image
+    (it reads 2026.5.22 while 2026.6.10-cc.slack1 is deployed), so setting the
+    label from it would replace a correct live value with a stale one and break
+    version grouping and deployment tracking in APM.
+
+    If you ever want an explicit version label, source it from .Values.image.tag,
+    never from Chart.AppVersion.
+*/ -}}
 {{- with $ctx.Values.datadog.env }}
 tags.datadoghq.com/env: {{ . | quote }}
 {{- end }}

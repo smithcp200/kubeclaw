@@ -29,6 +29,7 @@ spec:
       labels:
         {{- include "kubeclaw.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: gateway
+        {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "gateway") | nindent 8 }}
         {{- with .Values.pod.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

@@ -987,6 +987,27 @@ pod:
   affinity: {}
 
 # ------------------------------------------------------------------------------
+# Datadog
+#
+# Only labels. This chart does not install a Datadog agent; it stamps the pods
+# so that whatever agent runs on the cluster tags them correctly.
+# ------------------------------------------------------------------------------
+datadog:
+  # Value for the tags.datadoghq.com/env label on every pod.
+  #
+  # Leave empty when the cluster agent already applies a global env tag (ours
+  # sets env:prod in the DatadogAgent CR). Set it only if one cluster hosts more
+  # than one environment, where a single global tag cannot be correct.
+  env: ""
+
+  # Tenant account id for the tenfold.io/account-id label.
+  #
+  # Defaults to the namespace with the "openclaw-" prefix stripped, which is how
+  # the provisioner names tenant namespaces. Override only when the namespace
+  # does not follow that convention.
+  accountId: ""
+
+# ------------------------------------------------------------------------------
 # Service Account
 # ------------------------------------------------------------------------------
 serviceAccount:

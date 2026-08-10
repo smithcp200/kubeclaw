@@ -16,6 +16,7 @@ spec:
     metadata:
       labels:
         {{- include "kubeclaw.clusterCollectorSelectorLabels" . | nindent 8 }}
+        {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "otel-cluster") | nindent 8 }}
       annotations:
         {{- include "kubeclaw.clusterCollectorConfigChecksum" . | nindent 8 }}
     spec:

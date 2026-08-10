@@ -35,6 +35,7 @@ spec:
           labels:
             {{- include "kubeclaw.selectorLabels" . | nindent 12 }}
             app.kubernetes.io/component: qmd-embed
+            {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "qmd-embed") | nindent 12 }}
         spec:
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets:

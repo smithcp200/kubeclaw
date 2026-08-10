@@ -20,6 +20,7 @@ spec:
       labels:
         {{- include "kubeclaw.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: backup
+        {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "backup") | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

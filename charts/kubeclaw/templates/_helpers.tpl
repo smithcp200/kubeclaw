@@ -369,3 +369,66 @@ podAffinity:
           app.kubernetes.io/component: gateway
       topologyKey: kubernetes.io/hostname
 {{- end -}}
+
+{{/*
+Tenant account id, used to attribute telemetry to a customer.
+
+Nothing in the cluster carries the account id as a label today. It exists only
+inside the namespace name (openclaw-<uuid>), so grouping logs, metrics or spans
+by tenant meant string-parsing kube_namespace at every call site. Deriving it
+once here and stamping it on every pod makes tenant a first-class tag.
+
+The namespace is the source of truth because the provisioner already names it
+from the account id; datadog.accountId is an escape hatch for installs that do
+not follow that convention (local dev, self-hosted).
+*/}}
+{{- define "kubeclaw.accountId" -}}
+{{- if .Values.datadog.accountId }}
+{{- .Values.datadog.accountId }}
+{{- else if hasPrefix "openclaw-" .Release.Namespace }}
+{{- trimPrefix "openclaw-" .Release.Namespace }}
+{{- end }}
+{{- end }}
+
+{{/*
+Datadog unified service tags plus tenant attribution, for pod templates.
+
+WHY THIS EXISTS. With no explicit tags.datadoghq.com/service label the Datadog
+agent derives `service` from the pod name. For CronJob pods that name embeds the
+schedule counter, so every single run minted a brand new service:
+openclaw-kubeclaw-qmd-update-29764270, -29765115, -29763675 and so on. One
+namespace accumulated 1,778 distinct services in seven days. Service-level
+dashboards, monitors and the service catalog were all unusable for tenant
+workloads, and APM service sprawl made trace search useless.
+
+The service name is fullname + component, which deliberately REPRODUCES the
+names the two long-lived workloads already resolved to
+(openclaw-kubeclaw-gateway, openclaw-kubeclaw-egress-filter). Existing
+dashboards and monitors on those two keep working. Only the broken names change.
+
+Usage:
+  {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "gateway") | nindent 8 }}
+*/}}
+{{- define "kubeclaw.datadogPodLabels" -}}
+{{- $ctx := .ctx -}}
+tags.datadoghq.com/service: {{ printf "%s-%s" (include "kubeclaw.fullname" $ctx) .component | trunc 63 | trimSuffix "-" }}
+{{- /*
+    DELIBERATELY NO tags.datadoghq.com/version.
+
+    Datadog already derives `version` from the container image tag, and it is
+    correct today: gateway spans carry version 2026.6.10 from image tag
+    2026.6.10-cc.slack1. Chart.AppVersion is NOT maintained against the image
+    (it reads 2026.5.22 while 2026.6.10-cc.slack1 is deployed), so setting the
+    label from it would replace a correct live value with a stale one and break
+    version grouping and deployment tracking in APM.
+
+    If you ever want an explicit version label, source it from .Values.image.tag,
+    never from Chart.AppVersion.
+*/ -}}
+{{- with $ctx.Values.datadog.env }}
+tags.datadoghq.com/env: {{ . | quote }}
+{{- end }}
+{{- with (include "kubeclaw.accountId" $ctx) }}
+tenfold.io/account-id: {{ . | quote }}
+{{- end }}
+{{- end }}

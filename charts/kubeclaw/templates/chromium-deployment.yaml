@@ -16,6 +16,7 @@ spec:
     metadata:
       labels:
         {{- include "kubeclaw.chromiumSelectorLabels" . | nindent 8 }}
+        {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "chromium") | nindent 8 }}
     spec:
       securityContext:
         runAsUser: 1000

@@ -17,6 +17,7 @@ spec:
     metadata:
       labels:
         {{- include "kubeclaw.nodeCollectorSelectorLabels" . | nindent 8 }}
+        {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "otel-node") | nindent 8 }}
       annotations:
         {{- include "kubeclaw.nodeCollectorConfigChecksum" . | nindent 8 }}
     spec:

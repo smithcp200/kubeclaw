@@ -16,6 +16,7 @@ spec:
     metadata:
       labels:
         {{- include "kubeclaw.egressFilterSelectorLabels" . | nindent 8 }}
+        {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "egress-filter") | nindent 8 }}
       annotations:
         {{- include "kubeclaw.blockyConfigChecksum" . | nindent 8 }}
     spec:

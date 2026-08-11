@@ -45,12 +45,17 @@ remove_managed_skills() {
 
 merge_skills_config() {
   node "$RENDER_SKILLS_SCRIPT" "$SKILLS_DIR" "$SKILLS_PATCH_JSON" "$SKILLS_MANAGED_PREV_FILE"
+  # Always go through the merge, seeding an empty base when there is no config
+  # yet. The patch legitimately contains `null` tombstones (render-skills-config
+  # emits them to forget skills that are no longer installed) and only the merge
+  # strips them. Copying the patch in raw put literal nulls into openclaw.json,
+  # which the gateway rejects at startup with "skills.entries.<name>: Invalid
+  # input" and will not boot past.
   if [ ! -f "$CONFIG_DEST" ]; then
-    cp "$SKILLS_PATCH_JSON" "$CONFIG_DEST"
-  else
-    node "$MERGE_SCRIPT" "$CONFIG_DEST" "$SKILLS_PATCH_JSON" > "$CONFIG_DEST.tmp"
-    mv "$CONFIG_DEST.tmp" "$CONFIG_DEST"
+    printf '{}\n' > "$CONFIG_DEST"
   fi
+  node "$MERGE_SCRIPT" "$CONFIG_DEST" "$SKILLS_PATCH_JSON" > "$CONFIG_DEST.tmp"
+  mv "$CONFIG_DEST.tmp" "$CONFIG_DEST"
 }
 
 apply_desired_config() {

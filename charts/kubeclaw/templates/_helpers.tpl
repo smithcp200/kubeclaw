@@ -379,9 +379,11 @@ only by the StatefulSet. That is a trap once the values point at a TAINTED pool,
 which is exactly what the operator does when isolating tenants onto dedicated
 capacity.
 
-The failure is silent and total. The four Jobs/CronJobs (qmd-update, qmd-embed,
-diagnostics, backup-on-delete) are pinned by `kubeclaw.gatewayColocation` to the
-Gateway's own node, because they mount its ReadWriteOnce volume. Move the
+The failure is silent and total. The five Jobs/CronJobs (qmd-update, qmd-embed,
+diagnostics, backup, backup-on-delete) are pinned by `kubeclaw.gatewayColocation`
+to the Gateway's own node, because they mount its ReadWriteOnce volume. If you
+add another, `grep -l gatewayColocation templates/` is the authoritative list;
+counting from memory is how `backup` was missed the first time. Move the
 Gateway onto a tainted node while the Jobs tolerate nothing, and their one legal
 node becomes the one node they may not enter. They do not fail; they go Pending
 forever, and `concurrencyPolicy: Forbid` means the schedule never recovers.

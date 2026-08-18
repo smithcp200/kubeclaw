@@ -20,6 +20,13 @@ spec:
       annotations:
         {{- include "kubeclaw.clusterCollectorConfigChecksum" . | nindent 8 }}
     spec:
+      # Same placement as the rest of the chart's pods. Without it this
+      # Deployment drifts onto whatever untainted node exists, away from the pool
+      # the workloads it observes are isolated on. The sibling otel-node
+      # DaemonSet deliberately does NOT get this: it has its own
+      # observability.nodeCollector.tolerations knob, and a DaemonSet must not
+      # carry a nodeSelector or it stops covering nodes.
+      {{- include "kubeclaw.podPlacement" . | nindent 6 }}
       serviceAccountName: {{ include "kubeclaw.clusterCollectorName" . }}
       securityContext:
         runAsUser: 1000

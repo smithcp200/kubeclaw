@@ -276,10 +276,10 @@ spec:
           startupProbe:
             tcpSocket:
               port: gateway
-            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
-            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
-            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
-            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            initialDelaySeconds: {{ dig "startup" "initialDelaySeconds" 5 (.Values.probes | default dict) }}
+            failureThreshold: {{ dig "startup" "failureThreshold" 90 (.Values.probes | default dict) }}
+            periodSeconds: {{ dig "startup" "periodSeconds" 10 (.Values.probes | default dict) }}
+            timeoutSeconds: {{ dig "startup" "timeoutSeconds" 3 (.Values.probes | default dict) }}
 
           # Liveness/readiness use a lightweight TCP check on the gateway port
           # (same as the startup probe). The previous `node dist/index.js health`

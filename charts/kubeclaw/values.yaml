@@ -981,9 +981,13 @@ pod:
   labels: {}
   # Node selector.
   #
-  # Applies to EVERY pod in the release (Gateway, chromium, egress-filter, and
-  # the four Jobs/CronJobs), not just the Gateway. See kubeclaw.podPlacement in
-  # _helpers.tpl for why splitting them is a silent-Pending trap.
+  # Applies to every pod THIS CHART creates (Gateway, chromium, egress-filter,
+  # and the five Jobs/CronJobs), not just the Gateway. See kubeclaw.podPlacement
+  # in _helpers.tpl for why splitting them is a silent-Pending trap.
+  #
+  # Not "the release": a Helm release includes subcharts, and litellm, clickstack
+  # and envoy-gateway carry their own nodeSelector/tolerations values that this
+  # does not reach. Set those separately if you enable them.
   nodeSelector: {}
   # Tolerations. Same whole-release scope as nodeSelector above.
   tolerations: []
@@ -1018,9 +1022,9 @@ probes:
 # What it does buy: a drain that would take the last Gateway replica down blocks
 # and reports, instead of proceeding silently. Both drains during the 2026-08-16
 # outage logged `FailedDraining: 9 pods are waiting to be evicted` and went ahead
-# anyway, because no PDB existed anywhere in the cluster to make the eviction API
-# refuse. With this in place, Karpenter consolidation cannot quietly relocate a
-# customer's Gateway mid-conversation.
+# anyway, because no PDB protected any tenant workload. With this in place,
+# Karpenter consolidation cannot quietly relocate a customer's Gateway
+# mid-conversation.
 #
 # minAvailable: 1 against a single-replica StatefulSet deliberately means "never
 # voluntarily evict this pod". That is the correct posture for a stateful,
@@ -1032,6 +1036,11 @@ probes:
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
+  # AlwaysAllow, not the policy/v1 default of IfHealthyBudget. The default would
+  # refuse to evict the Gateway exactly when it is already broken, blocking the
+  # drain an operator reaches for to rescue it. See the long note in
+  # templates/pdb.yaml.
+  unhealthyPodEvictionPolicy: AlwaysAllow
 
 # ------------------------------------------------------------------------------
 # Datadog

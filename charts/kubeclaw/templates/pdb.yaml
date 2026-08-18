@@ -1,0 +1,43 @@
+{{- $pdb := .Values.podDisruptionBudget | default dict }}
+{{- if $pdb.enabled }}
+# PodDisruptionBudget for the Gateway.
+#
+# Guards the one pod in this release that a customer notices immediately. The
+# Gateway is single-replica by construction (it owns a ReadWriteOnce EBS volume),
+# so any eviction is downtime, with nothing to fail over to.
+#
+# Scoped to the gateway component only, deliberately. Chromium and the
+# egress-filter are stateless and restart cheaply; giving them budgets would
+# block node drains for no availability gain. The Jobs/CronJobs are batch work
+# and are excluded by the same selector.
+#
+# See the podDisruptionBudget block in values.yaml for what this does and does
+# not protect against (it stops voluntary drains, not Spot reclaims).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "kubeclaw.gatewayName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeclaw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  minAvailable: {{ $pdb.minAvailable | default 1 }}
+  # Without this, policy/v1 defaults to IfHealthyBudget, under which an
+  # unhealthy pod may be evicted only while currentHealthy >= desiredHealthy.
+  # On a single replica with minAvailable: 1 that arithmetic can never hold
+  # once the gateway is not Ready, so the budget would refuse to evict the pod
+  # PRECISELY BECAUSE it is broken. Draining a bad node to rescue a crash-looping
+  # gateway is the one drain an operator most needs, and it would have required
+  # --disable-eviction or deleting this object to proceed. The widened startup
+  # budget compounds it: the not-Ready window is now up to ~15 minutes per boot.
+  #
+  # AlwaysAllow still delivers what this PDB is for, because a pod that is
+  # serving is by definition healthy and stays protected. Stable since k8s 1.27;
+  # this cluster runs 1.36.
+  unhealthyPodEvictionPolicy: {{ $pdb.unhealthyPodEvictionPolicy | default "AlwaysAllow" }}
+  selector:
+    matchLabels:
+      {{- include "kubeclaw.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+{{- end }}

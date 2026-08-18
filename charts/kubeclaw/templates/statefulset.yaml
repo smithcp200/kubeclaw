@@ -59,14 +59,7 @@ spec:
       {{- with .Values.pod.runtimeClassName }}
       runtimeClassName: {{ . }}
       {{- end }}
-      {{- with .Values.pod.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.pod.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "kubeclaw.podPlacement" . | nindent 6 }}
       {{- with .Values.pod.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -256,14 +249,37 @@ spec:
           # -----------------------------------------------------------------------
 
           # Startup probe: TCP check until the Gateway binds port 18789.
-          # Allow up to 5 minutes for first startup (30 * 10s).
+          #
+          # Budget widened from 5 minutes to 15 on 2026-08-17 (30 -> 90 failures
+          # at 10s). The old 5-minute ceiling was not a safety margin, it was a
+          # tripwire, and on 2026-08-16 it fired on both tenants at once.
+          #
+          # What happened: a Spot reclaim moved every tenant pod onto one cold
+          # node. Nine pods pulled images and restored PVCs simultaneously, and
+          # the node's EBS volume reported `EBSVolumeIOPSExceeded ... for
+          # 8m15.487122s`. The Gateway logged its first bootstrap line and then
+          # nothing; at 09:48:53 and 09:49:00 MDT kubelet SIGKILLed both
+          # containers (exit 137) for exhausting exactly 5s + 30*10s = 305s. The
+          # retry then succeeded, which is the tell: the process was never
+          # broken, it was starved. Restarting a starved Gateway does not
+          # unstarve it, it just adds a cold start to a contended node and
+          # extends the customer's outage.
+          #
+          # For scale: on a healthy node this Gateway opens its port in ~98s,
+          # and the successful retry logged `provider auth state pre-warmed in
+          # 66245ms eventLoopMax=18555.6ms` — an 18-second event-loop stall on a
+          # box where the same work normally takes under a second. 15 minutes
+          # covers that with room to spare while still bounding a genuine hang.
+          #
+          # Liveness is unchanged and still catches a Gateway that dies later;
+          # this only governs how long a first boot may take.
           startupProbe:
             tcpSocket:
               port: gateway
-            initialDelaySeconds: 5
-            failureThreshold: 30
-            periodSeconds: 10
-            timeoutSeconds: 3
+            initialDelaySeconds: {{ dig "startup" "initialDelaySeconds" 5 (.Values.probes | default dict) }}
+            failureThreshold: {{ dig "startup" "failureThreshold" 90 (.Values.probes | default dict) }}
+            periodSeconds: {{ dig "startup" "periodSeconds" 10 (.Values.probes | default dict) }}
+            timeoutSeconds: {{ dig "startup" "timeoutSeconds" 3 (.Values.probes | default dict) }}
 
           # Liveness/readiness use a lightweight TCP check on the gateway port
           # (same as the startup probe). The previous `node dist/index.js health`

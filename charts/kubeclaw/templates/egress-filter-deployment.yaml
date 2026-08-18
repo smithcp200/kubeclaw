@@ -20,6 +20,7 @@ spec:
       annotations:
         {{- include "kubeclaw.blockyConfigChecksum" . | nindent 8 }}
     spec:
+      {{- include "kubeclaw.podPlacement" . | nindent 6 }}
       securityContext:
         runAsUser: 100
         runAsGroup: 100

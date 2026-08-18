@@ -38,6 +38,7 @@ spec:
           {{- end }}
           serviceAccountName: {{ include "kubeclaw.serviceAccountName" . }}
           restartPolicy: OnFailure
+          {{- include "kubeclaw.podPlacement" . | nindent 10 }}
           # Must run on the node holding the Gateway's ReadWriteOnce state PVC.
           affinity:
             {{- include "kubeclaw.gatewayColocation" . | nindent 12 }}

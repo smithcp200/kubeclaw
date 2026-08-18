@@ -371,6 +371,41 @@ podAffinity:
 {{- end -}}
 
 {{/*
+Node placement (nodeSelector + tolerations) shared by EVERY pod this chart
+creates, not just the Gateway.
+
+Why this exists: `pod.nodeSelector` and `pod.tolerations` were originally read
+only by the StatefulSet. That is a trap once the values point at a TAINTED pool,
+which is exactly what the operator does when isolating tenants onto dedicated
+capacity.
+
+The failure is silent and total. The five Jobs/CronJobs (qmd-update, qmd-embed,
+diagnostics, backup, backup-on-delete) are pinned by `kubeclaw.gatewayColocation`
+to the Gateway's own node, because they mount its ReadWriteOnce volume. If you
+add another, `grep -l gatewayColocation templates/` is the authoritative list;
+counting from memory is how `backup` was missed the first time. Move the
+Gateway onto a tainted node while the Jobs tolerate nothing, and their one legal
+node becomes the one node they may not enter. They do not fail; they go Pending
+forever, and `concurrencyPolicy: Forbid` means the schedule never recovers.
+Chromium and the egress-filter have the same problem without the affinity: they
+would simply drift onto whatever untainted node exists, away from the tenant
+pool they were meant to be isolated with.
+
+So placement belongs to every pod in the release. Emit unindented; callers
+supply nindent for their nesting depth (6 for Deployments, 10 for CronJobs).
+*/}}
+{{- define "kubeclaw.podPlacement" -}}
+{{- with .Values.pod.nodeSelector }}
+nodeSelector:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- with .Values.pod.tolerations }}
+tolerations:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end -}}
+
+{{/*
 Tenant account id, used to attribute telemetry to a customer.
 
 Nothing in the cluster carries the account id as a label today. It exists only

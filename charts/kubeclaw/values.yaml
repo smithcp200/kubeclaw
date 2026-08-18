@@ -980,11 +980,67 @@ pod:
   # Extra labels for the Gateway pod.
   labels: {}
   # Node selector.
+  #
+  # Applies to every pod THIS CHART creates (Gateway, chromium, egress-filter,
+  # and the five Jobs/CronJobs), not just the Gateway. See kubeclaw.podPlacement
+  # in _helpers.tpl for why splitting them is a silent-Pending trap.
+  #
+  # Not "the release": a Helm release includes subcharts, and litellm, clickstack
+  # and envoy-gateway carry their own nodeSelector/tolerations values that this
+  # does not reach. Set those separately if you enable them.
   nodeSelector: {}
-  # Tolerations.
+  # Tolerations. Same whole-release scope as nodeSelector above.
   tolerations: []
-  # Affinity rules.
+  # Affinity rules. Gateway ONLY — the Jobs/CronJobs set their own affinity to
+  # co-locate with the Gateway's ReadWriteOnce volume and must not be overridden.
   affinity: {}
+
+# ------------------------------------------------------------------------------
+# Health probe timings for the Gateway container.
+#
+# Only the startup probe is configurable. Liveness and readiness are steady-state
+# checks whose timings have not needed tuning; startup is the one that has to
+# absorb how slow a cold, contended node can be.
+# ------------------------------------------------------------------------------
+probes:
+  startup:
+    initialDelaySeconds: 5
+    # 90 * 10s = 15 minutes. Raised from 30 (5 minutes) after the 2026-08-16
+    # outage killed two healthy Gateways that were merely starved for disk IO.
+    # The full reasoning is on the startupProbe in statefulset.yaml.
+    failureThreshold: 90
+    periodSeconds: 10
+    timeoutSeconds: 3
+
+# ------------------------------------------------------------------------------
+# PodDisruptionBudget for the Gateway.
+#
+# Covers VOLUNTARY disruption only: node drains, `kubectl drain`, cluster
+# autoscaler/Karpenter consolidation, and node upgrades. It cannot stop a Spot
+# reclaim (that is involuntary, and the 2-minute clock runs out regardless).
+#
+# What it does buy: a drain that would take the last Gateway replica down blocks
+# and reports, instead of proceeding silently. Both drains during the 2026-08-16
+# outage logged `FailedDraining: 9 pods are waiting to be evicted` and went ahead
+# anyway, because no PDB protected any tenant workload. With this in place,
+# Karpenter consolidation cannot quietly relocate a customer's Gateway
+# mid-conversation.
+#
+# minAvailable: 1 against a single-replica StatefulSet deliberately means "never
+# voluntarily evict this pod". That is the correct posture for a stateful,
+# single-replica, ReadWriteOnce workload: there is no second replica to fail
+# over to, so a voluntary eviction is pure downtime with no availability
+# benefit. Node upgrades then require an explicit human decision, which is the
+# point.
+# ------------------------------------------------------------------------------
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # AlwaysAllow, not the policy/v1 default of IfHealthyBudget. The default would
+  # refuse to evict the Gateway exactly when it is already broken, blocking the
+  # drain an operator reaches for to rescue it. See the long note in
+  # templates/pdb.yaml.
+  unhealthyPodEvictionPolicy: AlwaysAllow
 
 # ------------------------------------------------------------------------------
 # Datadog

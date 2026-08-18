@@ -18,6 +18,7 @@ spec:
         {{- include "kubeclaw.chromiumSelectorLabels" . | nindent 8 }}
         {{- include "kubeclaw.datadogPodLabels" (dict "ctx" . "component" "chromium") | nindent 8 }}
     spec:
+      {{- include "kubeclaw.podPlacement" . | nindent 6 }}
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000

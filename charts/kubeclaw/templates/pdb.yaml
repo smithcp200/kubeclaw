@@ -1,0 +1,29 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+# PodDisruptionBudget for the Gateway.
+#
+# Guards the one pod in this release that a customer notices immediately. The
+# Gateway is single-replica by construction (it owns a ReadWriteOnce EBS volume),
+# so any eviction is downtime — there is nothing to fail over to.
+#
+# Scoped to the gateway component only, deliberately. Chromium and the
+# egress-filter are stateless and restart cheaply; giving them budgets would
+# block node drains for no availability gain. The Jobs/CronJobs are batch work
+# and are excluded by the same selector.
+#
+# See the podDisruptionBudget block in values.yaml for what this does and does
+# not protect against (it stops voluntary drains, not Spot reclaims).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "kubeclaw.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kubeclaw.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "kubeclaw.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+{{- end }}

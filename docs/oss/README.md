@@ -157,6 +157,7 @@ See [`values.yaml`](../../charts/kubeclaw/values.yaml) for all options with inli
 | `persistence.fixPermissions.enabled` | `true` | Normalize state directory ownership on startup |
 | `config.desired` | `""` | Desired `openclaw.json` (JSON5) |
 | `config.mode` | `merge` | Config strategy: `merge` or `overwrite` |
+| `config.checksumOverride` | `""` | Value for the Gateway's `checksum/config` pod annotation. Unset hashes the whole rendered ConfigMap, so any config change rolls the pod. Set it to a hash of `config.desired` minus the parts you apply to the running Gateway yourself (e.g. `mcp.servers`, via `openclaw mcp set/unset` + `openclaw mcp reload`) to stop those parts causing a restart |
 | `nodeOptions` | `"--max-old-space-size=1536"` | `NODE_OPTIONS` passed to the Gateway container |
 | `extraEnv` | `[]` | Extra env vars injected into the Gateway container |
 | `github.enabled` | `true` | Enable GitHub integration wiring (soft-enabled if token not set) |

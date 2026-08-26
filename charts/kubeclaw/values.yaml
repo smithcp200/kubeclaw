@@ -113,6 +113,39 @@ config:
   #       "gateway": { "mode": "local", "bind": "lan" },
   #       "tools": { "exec": { "enabled": true } }
   #     }
+  #
+  # checksumOverride: what counts as a config change worth restarting for.
+  #
+  # bootstrap.sh applies /config-src to the state config ONCE, at container
+  # start, so the checksum/config pod annotation is not belt-and-braces -- it is
+  # the only thing that makes a config change take effect. Every config change
+  # therefore restarts the Gateway, which takes the agent offline for as long as
+  # the pod takes to roll.
+  #
+  # Not every part of the config needs that. `mcp.servers` can be applied to a
+  # RUNNING Gateway with `openclaw mcp set` / `openclaw mcp unset` followed by
+  # `openclaw mcp reload`. A caller that does so should set this to a hash of
+  # `desired` WITHOUT its mcp block; adding a server then stops rolling the pod.
+  #
+  # HOW MUCH OF A BACKSTOP THE ConfigMap STILL IS DEPENDS ON `mode`, and the
+  # difference matters most for REMOVALS:
+  #
+  #   overwrite -- bootstrap COPIES desired over the state config, so a restart
+  #     reconstructs mcp.servers exactly, additions and removals alike. The
+  #     out-of-band call is an optimisation; the ConfigMap remains the truth.
+  #
+  #   merge (the default) -- bootstrap merge-patches desired ONTO the state
+  #     config, and a JSON merge-patch only deletes on an explicit null. A
+  #     server dropped from `desired` therefore SURVIVES a restart. With the
+  #     override set, nothing rolls the pod to make anyone notice, so removal
+  #     depends entirely on the `openclaw mcp unset` call having succeeded, with
+  #     no reconciliation behind it. Under `merge`, either null-tombstone the
+  #     removed keys or accept that removals are best-effort.
+  #
+  # Leave unset for the default behaviour (hash the whole rendered ConfigMap).
+  # Only set it if you are certain you apply the excluded parts out-of-band --
+  # a wrong value is a config change that silently never reaches the Gateway.
+  checksumOverride: ""
   desired: |
     {
       "gateway": {

@@ -105,6 +105,9 @@
         "mode": {
           "type": "string",
           "enum": ["merge", "overwrite"]
+        },
+        "checksumOverride": {
+          "type": "string"
         }
       }
     },

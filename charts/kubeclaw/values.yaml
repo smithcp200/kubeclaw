@@ -113,6 +113,25 @@ config:
   #       "gateway": { "mode": "local", "bind": "lan" },
   #       "tools": { "exec": { "enabled": true } }
   #     }
+  #
+  # checksumOverride: what counts as a config change worth restarting for.
+  #
+  # bootstrap.sh merges /config-src into the state config ONCE, at container
+  # start, so the checksum/config pod annotation is not belt-and-braces -- it is
+  # the only thing that makes a config change take effect. Every config change
+  # therefore restarts the Gateway, which takes the agent offline for as long as
+  # the pod takes to roll.
+  #
+  # Not every part of the config needs that. `mcp.servers` can be applied to a
+  # RUNNING Gateway with `openclaw mcp set` / `openclaw mcp unset` followed by
+  # `openclaw mcp reload`. A caller that does so should set this to a hash of
+  # `desired` WITHOUT its mcp block: the ConfigMap still carries the servers so a
+  # real restart reconstructs them, but adding one stops rolling the pod.
+  #
+  # Leave unset for the default behaviour (hash the whole rendered ConfigMap).
+  # Only set it if you are certain you apply the excluded parts out-of-band --
+  # a wrong value is a config change that silently never reaches the Gateway.
+  checksumOverride: ""
   desired: |
     {
       "gateway": {

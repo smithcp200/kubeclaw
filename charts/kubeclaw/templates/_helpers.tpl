@@ -153,13 +153,15 @@ Including this in the StatefulSet pod template triggers a rollout when config ch
 Usage: {{ include "kubeclaw.configChecksum" . }}
 
 `config.checksumOverride` lets the caller decide what counts as a config change.
-The reason it exists: bootstrap.sh merges /config-src into the state config ONCE,
-at container start, so this annotation is not belt-and-braces -- it is the only
-thing that makes a config change take effect, and therefore EVERY config change
-restarts the tenant's Gateway. Parts of the config do not need that. `mcp.servers`
-in particular can be applied to a running Gateway with `openclaw mcp set/unset`
-followed by `openclaw mcp reload`, so a caller that does so can hash the config
-WITHOUT its mcp block and stop rolling the pod to add a tool server.
+The reason it exists: bootstrap.sh applies /config-src to the state config ONCE,
+at container start (copying it under `config.mode: overwrite`, merge-patching it
+under `merge`), so this annotation is not belt-and-braces -- it is the only thing
+that makes a config change take effect, and therefore EVERY config change
+restarts the tenant's Gateway. Parts of the config do not need that.
+`mcp.servers` in particular can be applied to a running Gateway with
+`openclaw mcp set/unset` followed by `openclaw mcp reload`, so a caller that does
+so can hash the config WITHOUT its mcp block and stop rolling the pod to add a
+tool server.
 
 Left unset, behaviour is exactly as before: the whole rendered ConfigMap is
 hashed. The override is opt-in because getting it wrong means a config change

@@ -31,7 +31,7 @@
   },
   "qmd": {
     "enabled": true,
-    "packageUrl": "@tobilu/qmd@2.0.1",
-    "integrity": "sha512-v0fqksHGk2qSo8ztSshIB8Mkfdtdk+qKdKoEvsZ972fgvU7UCO0DSI+6xQMiSznBEbf89PRQVhz30yTIgRG3iw=="
+    "packageUrl": "@tobilu/qmd@2.8.3",
+    "integrity": "sha512-zjfVwrObPB618B6x8SdhlGv/tX9OxRHsbQnr5DUtBvqPK6HGQ27lM+9/BAY5okpjrHVnW56hLyDkqoTcsrVLzA=="
   }
 }

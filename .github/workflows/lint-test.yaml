@@ -185,12 +185,17 @@ jobs:
             --set tailscale.ssh.authKey=tskey-auth-example \
             --set egressFilter.enabled=false \
             > /tmp/openclaw-no-egress.yaml
+          # Assert against MANIFEST CONTENT only. These are substring greps, so
+          # a template comment that merely mentions egress-filter (the PDB
+          # explains why it deliberately does NOT cover that component) would
+          # otherwise read as a rendered resource and fail the job.
+          sed 's/#.*//' /tmp/openclaw-no-egress.yaml > /tmp/openclaw-no-egress.nocomments.yaml
           echo "Verifying dns-init initContainer absent when egressFilter disabled..."
-          ! grep -q "name: dns-init" /tmp/openclaw-no-egress.yaml || \
+          ! grep -q "name: dns-init" /tmp/openclaw-no-egress.nocomments.yaml || \
             { echo "FAIL: dns-init initContainer present when egressFilter disabled"; exit 1; }
           echo "PASS: dns-init initContainer absent"
           echo "Verifying egress-filter resources absent..."
-          ! grep -q "egress-filter" /tmp/openclaw-no-egress.yaml || \
+          ! grep -q "egress-filter" /tmp/openclaw-no-egress.nocomments.yaml || \
             { echo "FAIL: egress-filter resources present when disabled"; exit 1; }
           echo "PASS: egress-filter resources absent"
 
@@ -271,13 +276,19 @@ jobs:
             --set tailscale.ssh.authKey=tskey-auth-example \
             > "$GITHUB_WORKSPACE/rendered.yaml"
 
+      # 1.27, not 1.25: cc.6 gave the gateway a PodDisruptionBudget carrying
+      # spec.unhealthyPodEvictionPolicy, which entered the PDB schema in 1.27.
+      # Validating at 1.25 rejected it as an unknown property under -strict.
+      # The field is optional and older API servers prune it, so the chart still
+      # INSTALLS on 1.25; 1.27 is simply the floor at which it validates clean.
+      # Prod runs 1.36.
       - name: Kubeconform — validate manifests against K8s schemas
         uses: docker://ghcr.io/yannh/kubeconform:latest
         with:
           args: >-
             -summary
             -strict
-            -kubernetes-version 1.25.0
+            -kubernetes-version 1.27.0
             -schema-location default
             -schema-location https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
             -output text

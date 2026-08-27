@@ -25,25 +25,38 @@ function tryParse(text) {
   return JSON5.parse(text);
 }
 
+const isPlainObject = (value) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+// JSON Merge Patch, RFC 7386.
+//
+// The subtle part is what happens when the patch has an object at a key the
+// TARGET does not have. This previously assigned the patch subtree wholesale,
+// which quietly carried `null` tombstones into the output instead of treating
+// them as deletions. That is not cosmetic: render-skills-config.js emits
+// `skills.entries.<name>: null` to mean "forget this skill", and the tenant
+// config has no top-level `skills` key at all, so every tombstone landed in
+// openclaw.json as a literal null. The gateway then refused to start with
+// "skills.entries.<name>: Invalid input" and the tenant stayed down until
+// something else rewrote the config.
+//
+// RFC 7386 handles this by replacing a non-object target with {} and RECURSING
+// rather than assigning. Recursion is what strips the nulls, so it must happen
+// even when there is nothing in the target to merge into.
 function mergePatch(base, patch) {
-  if (typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+  // A non-object patch (scalar, array, or null) replaces the target outright.
+  // Arrays are values, not merge targets.
+  if (!isPlainObject(patch)) {
     return patch;
   }
 
-  const result = Object.assign({}, base);
+  const result = isPlainObject(base) ? Object.assign({}, base) : {};
+
   for (const [key, value] of Object.entries(patch)) {
     if (value === null) {
       delete result[key];
-    } else if (
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      typeof result[key] === 'object' &&
-      result[key] !== null &&
-      !Array.isArray(result[key])
-    ) {
-      result[key] = mergePatch(result[key], value);
     } else {
-      result[key] = value;
+      result[key] = mergePatch(result[key], value);
     }
   }
 

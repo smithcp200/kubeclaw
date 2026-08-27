@@ -528,11 +528,25 @@ networkPolicy:
 chromium:
   enabled: true
   image:
-    repository: zenika/alpine-chrome
-    tag: "124"
+    repository: chromedp/headless-shell
+    tag: "151.0.7922.109"
     # Immutable image digest to prevent tag drift (supply chain hardening).
-    digest: "sha256:26d54593b9a85e76d0a21729ca6f039dd1063e7261129776f27c9b91ef4dfef6"
+    digest: "sha256:2d349b544a1ea6b5b5fd7c0fe99215ff662339c57407ee2e8c0a11af93516b04"
     pullPolicy: IfNotPresent
+  # Entrypoint override. EMPTY on purpose, so the image's own entrypoint runs.
+  #
+  # This used to be ["chromium-browser"], which was a zenika/alpine-chrome
+  # binary name. It cannot simply be repointed at another image's binary,
+  # because modern Chrome REFUSES to bind the DevTools endpoint to a
+  # non-loopback address: pass --remote-debugging-address=0.0.0.0 and it still
+  # reports "DevTools listening on ws://127.0.0.1:9222", leaving the CDP
+  # Service with nothing to reach. headless-shell solves this in its
+  # entrypoint by binding Chrome on loopback:9223 and forwarding 9222 to it
+  # with socat. Overriding the command skips that shim and produces a pod that
+  # passes its tcpSocket probe while being unusable over the network.
+  #
+  # Set this only for an image that binds 0.0.0.0 itself.
+  command: []
   # Container port for Chrome DevTools Protocol.
   cdpPort: 9222
   # Resources for the Chromium Deployment.
@@ -544,8 +558,10 @@ chromium:
       cpu: 1000m
       memory: 1Gi
   # Security context for the Chromium Deployment container.
-  # zenika/alpine-chrome runs as uid 1000 (non-root) with a read-only root
-  # filesystem and drops all Linux capabilities.
+  # chromedp/headless-shell declares no USER, but its files are world-readable
+  # and world-executable, so it runs fine pinned to uid 1000 with a read-only
+  # root filesystem and all Linux capabilities dropped. Verified by running the
+  # image under exactly these constraints and driving CDP through it.
   # For stronger isolation, consider gVisor/Kata via pod.runtimeClassName.
   securityContext:
     runAsNonRoot: true
@@ -556,15 +572,16 @@ chromium:
     capabilities:
       drop:
         - ALL
-  # Default headless Chrome args with remote debugging enabled.
-  # Override or extend via extraArgs.
+  # Extra Chrome args, appended to the image entrypoint's own flags.
+  #
+  # Four flags that used to live here are now supplied by that entrypoint and
+  # MUST NOT be repeated: --no-sandbox, --remote-debugging-address=0.0.0.0 and
+  # --remote-debugging-port (it binds 9223 and socat-forwards 9222), plus
+  # --use-gl=angle/--use-angle=swiftshader. --headless is gone too, because
+  # headless-shell has no headful mode to switch off.
   extraArgs:
-    - --headless
     - --disable-gpu
-    - --no-sandbox
     - --disable-dev-shm-usage
-    - --remote-debugging-address=0.0.0.0
-    - --remote-debugging-port=9222
     - --user-data-dir=/tmp/chromium
 
 # ------------------------------------------------------------------------------

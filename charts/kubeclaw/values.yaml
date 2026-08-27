@@ -580,9 +580,9 @@ egressFilter:
   enabled: true
   image:
     repository: spx01/blocky
-    tag: "v0.24"
+    tag: "v0.34.0"
     # Immutable image digest to prevent tag drift (supply chain hardening).
-    digest: "sha256:9a82e0235c52ef3048586f8006add06e52132adaae70d02f980569dae16421a2"
+    digest: "sha256:595136fb127f4c952b621113e668c09acdcf15ac054d96ee6d4c51a76c35f5fd"
     pullPolicy: IfNotPresent
   # Number of Blocky replicas. 1 is sufficient for a single Gateway.
   replicas: 1
@@ -647,8 +647,25 @@ egressFilter:
   # Maintained blocklists (fetched and refreshed periodically by Blocky).
   # Each key is a named group; all groups are applied to every client.
   denylists:
+    # HaGeZi Threat Intelligence Feed.
+    #
+    # The previous URL (.../main/domains/tif.txt) has been returning 404 since
+    # the upstream repo dropped its domains/ tree, so this group silently
+    # loaded ZERO entries and the threat feed has not been filtering anything.
+    # Blocky logs the failure as a warning and starts anyway, which is why it
+    # went unnoticed. Found while smoke-testing the v0.34.0 bump.
+    #
+    # `medium`, not the full list, on measured grounds. Blocky RSS with our
+    # other lists, measured on v0.34.0 with this exact rendered config:
+    #   tif.mini    174,237 entries -> 45 MiB
+    #   tif.medium  329,778 entries -> 62 MiB
+    #   tif (full)  2,154,981 entries -> extrapolates to ~245 MiB
+    # The container limit is 256Mi, and a list refresh transiently holds both
+    # the old and new copy, so the full list would sit on the OOM boundary and
+    # take the gateway's DNS resolver down with it. medium peaks around
+    # 124 MiB, which leaves real headroom. Raise the limit before widening it.
     threats:
-      - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/tif.txt
+      - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.medium.txt
     malware:
       - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
     # oisd:

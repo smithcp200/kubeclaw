@@ -10,11 +10,15 @@
 image:
   # REQUIRED: Docker image repository for the OpenClaw Gateway.
   repository: ghcr.io/imerica/kubeclaw
-  # REQUIRED: Release tag produced by the image build workflow.
-  tag: "2026.4.2"
-  # Optional immutable digest for supply chain pinning.
-  # Set to a sha256 digest when you want strict immutability.
-  digest: "sha256:0b2170d5ec3a487a6313ed0556d377c5c5c80a0f806043daa2e685a4bedd45e3"
+  # REQUIRED: Immutable sha tag produced by the image build workflow.
+  # CI-managed: the build workflow rewrites tag + digest on every push to the
+  # default branch so the chart always pins an existing, reproducible image.
+  # Never set this to "latest" — deployments must be deterministic.
+  tag: "3faeb9b"
+  # REQUIRED: Immutable image digest for supply chain pinning. The container
+  # runtime resolves the pull by this digest, so the image is byte-for-byte
+  # reproducible regardless of tag movement. CI keeps this in sync with tag.
+  digest: "sha256:ddee40d27d22141390b7d8e8621c980189280a2e67aeb87a4a8d3c3a8b885dcb"
   # Pull policy: Always | IfNotPresent | Never
   pullPolicy: IfNotPresent
 
@@ -524,11 +528,25 @@ networkPolicy:
 chromium:
   enabled: true
   image:
-    repository: zenika/alpine-chrome
-    tag: "124"
+    repository: chromedp/headless-shell
+    tag: "151.0.7922.109"
     # Immutable image digest to prevent tag drift (supply chain hardening).
-    digest: "sha256:26d54593b9a85e76d0a21729ca6f039dd1063e7261129776f27c9b91ef4dfef6"
+    digest: "sha256:2d349b544a1ea6b5b5fd7c0fe99215ff662339c57407ee2e8c0a11af93516b04"
     pullPolicy: IfNotPresent
+  # Entrypoint override. EMPTY on purpose, so the image's own entrypoint runs.
+  #
+  # This used to be ["chromium-browser"], which was a zenika/alpine-chrome
+  # binary name. It cannot simply be repointed at another image's binary,
+  # because modern Chrome REFUSES to bind the DevTools endpoint to a
+  # non-loopback address: pass --remote-debugging-address=0.0.0.0 and it still
+  # reports "DevTools listening on ws://127.0.0.1:9222", leaving the CDP
+  # Service with nothing to reach. headless-shell solves this in its
+  # entrypoint by binding Chrome on loopback:9223 and forwarding 9222 to it
+  # with socat. Overriding the command skips that shim and produces a pod that
+  # passes its tcpSocket probe while being unusable over the network.
+  #
+  # Set this only for an image that binds 0.0.0.0 itself.
+  command: []
   # Container port for Chrome DevTools Protocol.
   cdpPort: 9222
   # Resources for the Chromium Deployment.
@@ -540,8 +558,10 @@ chromium:
       cpu: 1000m
       memory: 1Gi
   # Security context for the Chromium Deployment container.
-  # zenika/alpine-chrome runs as uid 1000 (non-root) with a read-only root
-  # filesystem and drops all Linux capabilities.
+  # chromedp/headless-shell declares no USER, but its files are world-readable
+  # and world-executable, so it runs fine pinned to uid 1000 with a read-only
+  # root filesystem and all Linux capabilities dropped. Verified by running the
+  # image under exactly these constraints and driving CDP through it.
   # For stronger isolation, consider gVisor/Kata via pod.runtimeClassName.
   securityContext:
     runAsNonRoot: true
@@ -552,15 +572,16 @@ chromium:
     capabilities:
       drop:
         - ALL
-  # Default headless Chrome args with remote debugging enabled.
-  # Override or extend via extraArgs.
+  # Extra Chrome args, appended to the image entrypoint's own flags.
+  #
+  # Four flags that used to live here are now supplied by that entrypoint and
+  # MUST NOT be repeated: --no-sandbox, --remote-debugging-address=0.0.0.0 and
+  # --remote-debugging-port (it binds 9223 and socat-forwards 9222), plus
+  # --use-gl=angle/--use-angle=swiftshader. --headless is gone too, because
+  # headless-shell has no headful mode to switch off.
   extraArgs:
-    - --headless
     - --disable-gpu
-    - --no-sandbox
     - --disable-dev-shm-usage
-    - --remote-debugging-address=0.0.0.0
-    - --remote-debugging-port=9222
     - --user-data-dir=/tmp/chromium
 
 # ------------------------------------------------------------------------------
@@ -576,9 +597,9 @@ egressFilter:
   enabled: true
   image:
     repository: spx01/blocky
-    tag: "v0.24"
+    tag: "v0.34.0"
     # Immutable image digest to prevent tag drift (supply chain hardening).
-    digest: "sha256:9a82e0235c52ef3048586f8006add06e52132adaae70d02f980569dae16421a2"
+    digest: "sha256:595136fb127f4c952b621113e668c09acdcf15ac054d96ee6d4c51a76c35f5fd"
     pullPolicy: IfNotPresent
   # Number of Blocky replicas. 1 is sufficient for a single Gateway.
   replicas: 1
@@ -643,8 +664,25 @@ egressFilter:
   # Maintained blocklists (fetched and refreshed periodically by Blocky).
   # Each key is a named group; all groups are applied to every client.
   denylists:
+    # HaGeZi Threat Intelligence Feed.
+    #
+    # The previous URL (.../main/domains/tif.txt) has been returning 404 since
+    # the upstream repo dropped its domains/ tree, so this group silently
+    # loaded ZERO entries and the threat feed has not been filtering anything.
+    # Blocky logs the failure as a warning and starts anyway, which is why it
+    # went unnoticed. Found while smoke-testing the v0.34.0 bump.
+    #
+    # `medium`, not the full list, on measured grounds. Blocky RSS with our
+    # other lists, measured on v0.34.0 with this exact rendered config:
+    #   tif.mini    174,237 entries -> 45 MiB
+    #   tif.medium  329,778 entries -> 62 MiB
+    #   tif (full)  2,154,981 entries -> extrapolates to ~245 MiB
+    # The container limit is 256Mi, and a list refresh transiently holds both
+    # the old and new copy, so the full list would sit on the OOM boundary and
+    # take the gateway's DNS resolver down with it. medium peaks around
+    # 124 MiB, which leaves real headroom. Raise the limit before widening it.
     threats:
-      - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/tif.txt
+      - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/tif.medium.txt
     malware:
       - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
     # oisd:
@@ -718,6 +756,8 @@ backup:
   image:
     repository: rclone/rclone
     tag: "1.68"
+    # Immutable image digest (supply chain hardening). Pull resolves by digest.
+    digest: "sha256:74c51b8817e5431bd6d7ed27cb2a50d8ee78d77f6807b72a41ef6f898845942b"
     pullPolicy: IfNotPresent
   # Cron schedule (default: daily at 2am UTC).
   schedule: "0 2 * * *"
@@ -763,6 +803,8 @@ tailscale:
     image:
       repository: tailscale/tailscale
       tag: "v1.78.1"
+      # Immutable image digest (supply chain hardening). Pull resolves by digest.
+      digest: "sha256:d00e735ed066b4e8a2d0acace57a5fcd8e04d2e26493275bc9df2c1f59732167"
       pullPolicy: IfNotPresent
     # Tailscale auth key (inline). One of authKey or authKeySecretName is
     # required when ssh.enabled=true (enforced by values.schema.json).
@@ -822,6 +864,8 @@ observability:
     image:
       repository: otel/opentelemetry-collector-contrib
       tag: "0.120.0"
+      # Immutable image digest (supply chain hardening). Pull resolves by digest.
+      digest: "sha256:85ac41c2db88d0df9bd6145e608a3cb023f5d8443868adbfbbf66efb51087917"
       pullPolicy: IfNotPresent
     resources:
       requests:
@@ -841,6 +885,8 @@ observability:
     image:
       repository: otel/opentelemetry-collector-contrib
       tag: "0.120.0"
+      # Immutable image digest (supply chain hardening). Pull resolves by digest.
+      digest: "sha256:85ac41c2db88d0df9bd6145e608a3cb023f5d8443868adbfbbf66efb51087917"
       pullPolicy: IfNotPresent
     resources:
       requests:

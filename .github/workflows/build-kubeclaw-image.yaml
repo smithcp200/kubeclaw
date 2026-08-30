@@ -1,9 +1,28 @@
 name: Build KubeClaw Image
 
+# MANUAL ONLY, deliberately.
+#
+# Upstream triggers this on `push` with nothing but `tags-ignore`, which in
+# GitHub Actions means EVERY BRANCH PUSH, not just tags. Combined with the
+# "Pin image to chart values" step this workflow gained in upstream's New CD
+# process, a plain `git push origin master` would: build and push a new base
+# image, move the `:latest` tag, and then COMMIT BACK to master rewriting
+# charts/kubeclaw/values.yaml with the new tag and digest.
+#
+# Three reasons that is wrong for this fork:
+#   - It would drift master away from the chart version already published to
+#     oci://ghcr.io/smithcp200 (2026.6.10-cc.8 at the time of writing).
+#   - We build the gateway image in TWO steps (this base, then the slack layer
+#     in command-center), and only the second is what production runs. An
+#     automatic base build produces an image nothing consumes.
+#   - It has never run on this fork. Its first execution should be something
+#     someone chose, not a side effect of pushing a branch.
+#
+# Run it from the Actions tab when you actually want a new base image. To go
+# back to push-triggered CD, restore a `push:` trigger with an explicit
+# `branches: [master]` AND a `paths:` filter on images/kubeclaw/** -- never
+# `tags-ignore` alone.
 on:
-  push:
-    tags-ignore:
-      - "v*"
   workflow_dispatch:
 
 permissions:

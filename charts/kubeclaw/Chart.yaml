@@ -6,7 +6,7 @@ description: >
   deployment path without giving up flexibility.
 type: application
 version: 2026.6.10-cc.8
-appVersion: "2026.7.1-2"
+appVersion: "2026.8.2"
 dependencies:
   - name: litellm-helm
     version: "1.81.13"

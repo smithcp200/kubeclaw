@@ -14,11 +14,11 @@ image:
   # CI-managed: the build workflow rewrites tag + digest on every push to the
   # default branch so the chart always pins an existing, reproducible image.
   # Never set this to "latest" — deployments must be deterministic.
-  tag: "3faeb9b"
+  tag: "756ff9b"
   # REQUIRED: Immutable image digest for supply chain pinning. The container
   # runtime resolves the pull by this digest, so the image is byte-for-byte
   # reproducible regardless of tag movement. CI keeps this in sync with tag.
-  digest: "sha256:ddee40d27d22141390b7d8e8621c980189280a2e67aeb87a4a8d3c3a8b885dcb"
+  digest: "sha256:cacad906948348b6a2b9fbb6ced735bcebfbcd338a1bbe9064829187537086b4"
   # Pull policy: Always | IfNotPresent | Never
   pullPolicy: IfNotPresent
 

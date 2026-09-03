@@ -225,14 +225,7 @@ config:
         ]
       },
       "memory": {
-        "backend": "qmd",
-        "citations": "auto",
-        "qmd": {
-          "includeDefaultMemory": true,
-          "searchMode": "search",
-          "update": { "interval": "5m", "debounceMs": 15000 },
-          "limits": { "maxResults": 6, "timeoutMs": 4000 }
-        }
+        "citations": "auto"
       }
     }
   # merge: apply JSON merge-patch (objects merge recursively, arrays replace,
@@ -338,66 +331,6 @@ obsidian:
     size: 5Gi
     accessModes:
       - ReadWriteOnce
-
-# ------------------------------------------------------------------------------
-# Memory (QMD)
-# QMD is a local-first hybrid search sidecar that combines BM25 + vectors +
-# reranking for hybrid memory search. The Gateway shells out to the `qmd` CLI
-# for retrieval operations. QMD stores its state (SQLite DB + embeddings) on
-# the Gateway PVC under ~/.openclaw/agents/<agentId>/qmd/.
-#
-# QMD is preinstalled in the kubeclaw image at build time.
-#
-# CronJobs run periodic `qmd update` (re-index markdown into BM25) and
-# `qmd embed` (generate vector embeddings) to supplement the Gateway's
-# internal timers with K8s-native observability (job status, pod logs, alerts).
-#
-# The first `qmd embed` run downloads a ~0.6 GB GGUF embedding model via
-# node-llama-cpp. The model is cached on the PVC for subsequent runs.
-#
-# Docs: https://docs.openclaw.ai/reference/memory-config#qmd-backend-experimental
-# ------------------------------------------------------------------------------
-memory:
-  enabled: true
-  # CronJob: qmd update (re-indexes markdown files into BM25 search index).
-  update:
-    schedule: "*/5 * * * *"
-    concurrencyPolicy: Forbid
-    successfulJobsHistoryLimit: 1
-    failedJobsHistoryLimit: 1
-    # Fail the job if a run exceeds this. Keep it at or under the schedule
-    # interval: with Forbid an unbounded run blocks every later tick, so the
-    # deadline is what lets the schedule recover without a human. Set to null
-    # to disable (not recommended).
-    activeDeadlineSeconds: 300
-    backoffLimit: 2
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
-  # CronJob: qmd embed (generates vector embeddings for hybrid search).
-  # Runs less frequently because embedding is CPU-intensive and the GGUF
-  # model (~0.6 GB) is auto-downloaded on first run and cached on the PVC.
-  embed:
-    schedule: "*/15 * * * *"
-    concurrencyPolicy: Forbid
-    successfulJobsHistoryLimit: 1
-    failedJobsHistoryLimit: 1
-    # Deliberately longer than the 15m schedule: the first run downloads the
-    # ~0.6 GB GGUF model onto the PVC, and killing that mid-download makes every
-    # later run start over. Worst case a wedged run costs two ticks.
-    activeDeadlineSeconds: 1800
-    backoffLimit: 1
-    resources:
-      requests:
-        cpu: 500m
-        memory: 1Gi
-      limits:
-        cpu: "2"
-        memory: 2Gi
 
 # ------------------------------------------------------------------------------
 # Node.js runtime options
